@@ -7,16 +7,33 @@ import com.pedropathing.math.Pose
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import org.firstinspires.ftc.teamcode.pedro.Constants
+import org.firstinspires.ftc.teamcode.tools.Flywheel
+import org.firstinspires.ftc.teamcode.tools.Intake
+import org.firstinspires.ftc.teamcode.tools.Transfer
 
 @TeleOp(name = "Scrimmage TeleOp")
 class scrimmageTele : OpMode() {
     private lateinit var follower: Follower
+    private lateinit var intake: Intake
+    private lateinit var transfer: Transfer
+    private lateinit var flywheel: Flywheel
 
     override fun init() {
         follower = Constants.create(hardwareMap)
+        intake = Intake(hardwareMap, "intake")
+        transfer = Transfer(hardwareMap, "transfer")
+        flywheel = Flywheel(hardwareMap, "flywheel")
     }
 
     override fun loop() {
+
+        if (gamepad1.left_trigger_pressed) {
+            intake.run()
+        }
+        if (gamepad1.right_trigger_pressed) {
+            transfer.run()
+            flywheel.run()
+        }
 
         val powers: DrivePowers = ManualDrive.fieldCentric(
             -gamepad1.left_stick_y.toDouble(),

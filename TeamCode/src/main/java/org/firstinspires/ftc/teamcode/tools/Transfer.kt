@@ -8,6 +8,4 @@ class Transfer(
     hardwareMap: HardwareMap,
     name: String,
     direction: DcMotorSimple.Direction = DcMotorSimple.Direction.FORWARD
-) : motor(hardwareMap, name, direction) {
-
-}
+) : motor(hardwareMap, name, direction)

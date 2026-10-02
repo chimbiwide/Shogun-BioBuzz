@@ -1,12 +1,10 @@
 package org.firstinspires.ftc.teamcode.tools
 
-import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
-import org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap
 import org.firstinspires.ftc.teamcode.control.motor
 
-class Intake(
+class Flywheel(
     hardwareMap: HardwareMap,
     name: String,
     direction: DcMotorSimple.Direction = DcMotorSimple.Direction.FORWARD
