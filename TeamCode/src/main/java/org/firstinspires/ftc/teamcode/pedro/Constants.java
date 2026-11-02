@@ -46,10 +46,17 @@ public class Constants {
     );
 
     public static Follower create(HardwareMap hp) {
+        Foresight foresight;
+        try {
+            foresight = new Foresight(foresightConfig);
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException("Pedro is not tuned yet: run the Foresight Tuner "
+                    + "(http://192.168.43.1:10158) and paste its results into Constants.foresightConfig.", e);
+        }
         return new Follower(
                 new PinpointLocalizer(hp, localizerConfig),
                 new Mecanum(hp, drivetrainConfig),
-                new Foresight(foresightConfig)
+                foresight
         );
     }
 }

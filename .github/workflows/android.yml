@@ -38,7 +38,7 @@ jobs:
           packages: platform-tools
 
       - name: Install SDK platform and NDK
-        run: sdkmanager "platforms;android-30" "ndk;21.3.6528147"
+        run: sdkmanager "platforms;android-30" "platforms;android-37.0" "ndk;21.3.6528147"
 
       - name: Assemble debug APK
         run: ./gradlew :TeamCode:assembleDebug --no-daemon --stacktrace

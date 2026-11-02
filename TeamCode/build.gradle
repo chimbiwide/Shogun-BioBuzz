@@ -19,6 +19,9 @@ apply from: '../build.dependencies.gradle'
 
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
+    // Panels pulls in AndroidX/Material libraries that must be compiled against Android API 34 or newer
+    // (build.common.gradle uses 30). This only changes compiling; the app still runs on the Control Hub.
+    compileSdk = 37
 
     packagingOptions {
         jniLibs.useLegacyPackaging true
