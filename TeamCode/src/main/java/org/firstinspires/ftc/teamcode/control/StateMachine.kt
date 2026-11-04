@@ -14,13 +14,20 @@ class StateMachine(
     var intake: Intake,
     var transfer: Transfer,
     var shooter: Shooter,
-    turret: Turret
+    var turret: Turret
+
 ) {
     var state: STATE = STATE.IDLE
 
     fun runState(state: STATE) {
         when (state) {
-            STATE.IDLE -> {}
+
+            STATE.IDLE -> {
+                intake.stop()
+                drivetrain.stop()
+                transfer.stop()
+                shooter.flywheel.stop()
+            }
             STATE.DRIVE -> {}
             STATE.INTAKE -> {}
             STATE.EJECT -> {}
