@@ -82,3 +82,6 @@ lint/generated/
 lint/outputs/
 lint/tmp/
 # lint/reports/
+
+BIOBUZZ_GUIDE.md
+BOT.md
