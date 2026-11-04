@@ -18,7 +18,11 @@ class StateMachine(
 
     fun runState(state: STATE) {
         when (state) {
-
+            STATE.IDLE -> {}
+            STATE.DRIVE -> {}
+            STATE.INTAKE -> {}
+            STATE.AIM -> {}
+            STATE.SHOOT -> {}
         }
     }
 }
