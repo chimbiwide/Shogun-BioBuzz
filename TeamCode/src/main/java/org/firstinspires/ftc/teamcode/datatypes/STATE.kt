@@ -4,6 +4,7 @@ enum class STATE {
     IDLE,
     DRIVE,
     INTAKE,
+    EJECT,
     AIM,
     SHOOT
 }

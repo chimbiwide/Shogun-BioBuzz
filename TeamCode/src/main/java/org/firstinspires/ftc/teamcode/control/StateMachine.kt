@@ -21,6 +21,7 @@ class StateMachine(
             STATE.IDLE -> {}
             STATE.DRIVE -> {}
             STATE.INTAKE -> {}
+            STATE.EJECT -> {}
             STATE.AIM -> {}
             STATE.SHOOT -> {}
         }
