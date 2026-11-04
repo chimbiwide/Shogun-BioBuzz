@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.control
 
+import com.pedropathing.follower.ManualDrive
+import com.pedropathing.math.Pose
 import com.pedropathing.revhub.drivetrains.Mecanum
 import org.firstinspires.ftc.teamcode.datatypes.STATE
 import org.firstinspires.ftc.teamcode.tools.Intake
@@ -8,10 +10,10 @@ import org.firstinspires.ftc.teamcode.tools.Transfer
 import org.firstinspires.ftc.teamcode.tools.Turret
 
 class StateMachine(
-    drivetrain: Mecanum,
-    intake: Intake,
-    transfer: Transfer,
-    shooter: Shooter,
+    var drivetrain: Mecanum,
+    var intake: Intake,
+    var transfer: Transfer,
+    var shooter: Shooter,
     turret: Turret
 ) {
     var state: STATE = STATE.IDLE
@@ -25,5 +27,16 @@ class StateMachine(
             STATE.AIM -> {}
             STATE.SHOOT -> {}
         }
+    }
+
+    private fun drive(forward: Double,
+                      strafe: Double,
+                      turn: Double,
+                      speed: Double,
+                      pose: Pose) {
+        val powers = ManualDrive.fieldCentric(
+            forward * speed, strafe * speed, turn * speed, pose.heading(), 0.0
+        )
+        drivetrain.drive(powers, true)
     }
 }

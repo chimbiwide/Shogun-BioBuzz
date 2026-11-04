@@ -9,6 +9,8 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
 import org.firstinspires.ftc.teamcode.RobotConstants
+import org.firstinspires.ftc.teamcode.control.StateMachine
+import org.firstinspires.ftc.teamcode.datatypes.STATE
 import org.firstinspires.ftc.teamcode.pedro.Constants
 import org.firstinspires.ftc.teamcode.tools.Intake
 import org.firstinspires.ftc.teamcode.tools.Shooter
@@ -43,6 +45,8 @@ class SimpleTele : OpMode() {
     // Never use "runtime" for matchtime: it starts counting at INIT, not at START.
     private val matchTimer = ElapsedTime()
     private var flywheelStoppedAtEnd = false
+    private lateinit var machine: StateMachine
+    private lateinit var states: STATE
 
     override fun init() {
         for (hub in hardwareMap.getAll(LynxModule::class.java)) {
@@ -55,6 +59,7 @@ class SimpleTele : OpMode() {
         transfer = Transfer(hardwareMap)
         shooter = Shooter(hardwareMap)
         turret = Turret(hardwareMap)
+        states = STATE.IDLE
     }
 
     override fun init_loop() {
@@ -65,6 +70,14 @@ class SimpleTele : OpMode() {
     override fun start() {
         matchTimer.reset()
         localizer.setPose(Pose.zero())
+        machine = StateMachine(
+            drivetrain,
+            intake,
+            transfer,
+            shooter,
+            turret
+        )
+
     }
 
     override fun loop() {
@@ -73,7 +86,10 @@ class SimpleTele : OpMode() {
 
         var turretPos = 0.0
 
+
+        machine.runState(states)
         drive(pose)
+
         shooterButtons()
 
         if (gamepad1.dpadLeftWasPressed()) {
