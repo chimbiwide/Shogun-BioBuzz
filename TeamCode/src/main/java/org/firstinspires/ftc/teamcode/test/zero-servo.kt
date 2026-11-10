@@ -22,6 +22,5 @@ class `zero-servo`: LinearOpMode() {
         servo1.position = 0.0
         servo2.position = 0.0
         //This is ABA 120-0 Hex Code combo
-
     }
 }
