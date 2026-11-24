@@ -1,9 +1,8 @@
 package org.firstinspires.ftc.teamcode.teleOp
 
+import com.pedropathing.follower.Follower
 import com.pedropathing.follower.ManualDrive
 import com.pedropathing.math.Pose
-import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
@@ -35,8 +34,7 @@ import org.firstinspires.ftc.teamcode.tools.Turret
  */
 @TeleOp(name = "Simple TeleOp", group = "BioBuzz")
 class SimpleTele : OpMode() {
-    private lateinit var drivetrain: Mecanum
-    private lateinit var localizer: PinpointLocalizer
+    private lateinit var follower: Follower
     private lateinit var intake: Intake
     private lateinit var transfer: Transfer
     private lateinit var shooter: Shooter
@@ -53,8 +51,7 @@ class SimpleTele : OpMode() {
             hub.bulkCachingMode = LynxModule.BulkCachingMode.AUTO
         }
 
-        drivetrain = Mecanum(hardwareMap, Constants.drivetrainConfig)
-        localizer = PinpointLocalizer(hardwareMap, Constants.localizerConfig)
+        follower = Constants.create(hardwareMap)
         intake = Intake(hardwareMap)
         transfer = Transfer(hardwareMap)
         shooter = Shooter(hardwareMap)
@@ -69,9 +66,9 @@ class SimpleTele : OpMode() {
 
     override fun start() {
         matchTimer.reset()
-        localizer.setPose(Pose.zero())
+        follower.setPose(Pose.zero())
         machine = StateMachine(
-            drivetrain,
+            follower,
             intake,
             transfer,
             shooter,
@@ -81,8 +78,8 @@ class SimpleTele : OpMode() {
     }
 
     override fun loop() {
-        localizer.update()
-        val pose = localizer.pose()
+        follower.update()
+        val pose = follower.pose()
 
         var turretPos = 0.0
 
@@ -113,7 +110,8 @@ class SimpleTele : OpMode() {
         shooter.flywheel.setRpm(0.0)
         intake.stop()
         transfer.stop()
-        drivetrain.stop()
+        follower.stop()
+        follower.update()   // the follower only sends commands to the motors in update()
     }
 
     private fun drive(pose: Pose) {
@@ -129,10 +127,10 @@ class SimpleTele : OpMode() {
         val powers = ManualDrive.fieldCentric(
             forward * speed, strafe * speed, turn * speed, pose.heading(), 0.0
         )
-        drivetrain.drive(powers, true)
+        follower.manual(powers)   // sent to the motors at the next follower.update()
 
         if (gamepad1.shareWasPressed() && gamepad1.options) {
-            localizer.setPose(pose.withHeading(0.0))
+            follower.setPose(pose.withHeading(0.0))
             gamepad1.rumble(300)
         }
     }

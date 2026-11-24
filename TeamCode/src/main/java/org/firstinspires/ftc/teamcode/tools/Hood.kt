@@ -9,7 +9,7 @@ class Hood(hardwareMap: HardwareMap) {
     private val servo: Servo = hardwareMap.get(Servo::class.java, RobotConstants.HOOD_SERVO)
 
     /** The servo position we last sent. */
-    var position = 0.0
+    var position = 1.0
         private set
 
     fun setPosition(newPosition: Double) {

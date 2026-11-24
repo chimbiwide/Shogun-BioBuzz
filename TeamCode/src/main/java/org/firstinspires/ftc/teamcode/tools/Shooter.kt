@@ -30,6 +30,11 @@ class Shooter(hardwareMap: HardwareMap) {
     var rpmOffset = 0.0
     var hoodOffset = 0.0
 
+    // When not null, used instead of the shot table (and the offsets above). Only the Shot Collector's
+    // SET mode sets these, so the operator can pick the exact speed and hood for each ball.
+    var rpmOverride: Double? = null
+    var hoodOverride: Double? = null
+
     /** Distance from the turret to the target (inches), from the last aim. */
     var distance = 0.0
         private set
@@ -115,9 +120,9 @@ class Shooter(hardwareMap: HardwareMap) {
 
     private fun useDistance(distanceInches: Double) {
         setting = ShotTable.lookUp(distanceInches + distanceTrimInches)
-        hood.setPosition(setting.hoodPosition + hoodOffset)
+        hood.setPosition(hoodOverride ?: (setting.hoodPosition + hoodOffset))
         if (isOn) {
-            flywheel.setRpm(setting.flywheelRpm + rpmOffset)
+            flywheel.setRpm(rpmOverride ?: (setting.flywheelRpm + rpmOffset))
         } else {
             flywheel.setRpm(0.0)
         }

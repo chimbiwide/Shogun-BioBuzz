@@ -27,7 +27,7 @@ class ShotLogger(folder: File, opModeName: String, private val labelTimeoutSecon
         val loopMs: Double,                  // how long the last loop took
         val alliance: String,
         val cell: String,                    // the CELL we aim at
-        val mode: String,                    // TELEOP, SWEEP or TEST
+        val mode: String,                    // TELEOP, SET, SWEEP or TEST
         val x: Double, val y: Double, val headingDegrees: Double,
         val vx: Double, val vy: Double,      // robot velocity on the field (in/s)
         val targetX: Double, val targetY: Double,   // the CELL opening

@@ -2,11 +2,10 @@ package org.firstinspires.ftc.teamcode.teleOp
 
 import com.bylazar.telemetry.JoinedTelemetry
 import com.bylazar.telemetry.PanelsTelemetry
+import com.pedropathing.follower.Follower
 import com.pedropathing.follower.ManualDrive
 import com.pedropathing.math.Pose
 import com.pedropathing.math.Velocity
-import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.pedropathing.utils.Angle
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.hardware.lynx.LynxModule
@@ -53,7 +52,12 @@ import kotlin.math.hypot
  *   triangle .......... flywheel on / off
  *   right trigger ..... shoot ONE ball (when READY, and only after the last shot has its label)
  *   left trigger ...... un-jam                                   bumpers ......... nudge the aim left / right
- *   square ............ SWEEP mode (a random speed and hood change after every shot) <-> TEST mode (no changes)
+ *   square ............ next mode: SET -> SWEEP -> TEST -> SET
+ *     SET (the default): YOU pick the flywheel speed and hood; the shot table is not used.
+ *       left stick up / down ... speed +/- SET_RPM_STEP      right stick up / down ... hood +/- SET_HOOD_STEP
+ *       (hold a stick to keep stepping)                       left stick button ...... start from the shot table here
+ *     SWEEP: the shot table plus a random speed and hood change after every shot.
+ *     TEST: the shot table, no changes.
  *   Labels for the last shot (press another one before feeding the next ball to fix a mistake):
  *     cross ........... IN (went in)
  *     dpad down ....... SHORT (too low or too weak)          dpad up ......... LONG (too high or too strong)
@@ -65,8 +69,7 @@ import kotlin.math.hypot
 @TeleOp(name = "Shot Collector", group = "BioBuzz Tuning")
 class ShotCollector : OpMode() {
     private lateinit var hubs: List<LynxModule>
-    private lateinit var drivetrain: Mecanum
-    private lateinit var localizer: PinpointLocalizer
+    private lateinit var follower: Follower
     private lateinit var intake: Intake
     private lateinit var transfer: Transfer
     private lateinit var shooter: Shooter
@@ -79,8 +82,15 @@ class ShotCollector : OpMode() {
     private val loopTimer = ElapsedTime()
     private val feedTimer = ElapsedTime()
 
+    /** How the flywheel speed and hood are picked (see the controls at the top). Logged in the "mode" column. */
+    private enum class CollectMode { SET, SWEEP, TEST }
+
     private var targetCell = HiveCell.AUDIENCE_SIDE   // RED's CELL that starts up
-    private var sweepMode = true
+    private var mode = CollectMode.SET
+    private var setRpm = 0.0      // SET mode: the speed and hood the operator picked
+    private var setHood = 0.0
+    private val rpmStick = StickSteps()
+    private val hoodStick = StickSteps()
     private var feedingOneBall = false
     private var wasReady = false
     private var feedsWithoutShot = 0
@@ -96,8 +106,8 @@ class ShotCollector : OpMode() {
         for (hub in hubs) {
             hub.bulkCachingMode = LynxModule.BulkCachingMode.MANUAL
         }
-        drivetrain = Mecanum(hardwareMap, Constants.drivetrainConfig)
-        localizer = PinpointLocalizer(hardwareMap, Constants.localizerConfig)
+        follower = Constants.create(hardwareMap)
+        // The same Pinpoint the follower uses, to correct only x and y when the webcam fixes our position.
         pinpoint = hardwareMap.getAll(GoBildaPinpointDriver::class.java).firstOrNull()
         intake = Intake(hardwareMap)
         transfer = Transfer(hardwareMap)
@@ -119,10 +129,11 @@ class ShotCollector : OpMode() {
     override fun start() {
         clock.reset()
         loopTimer.reset()
-        localizer.setPose(Field.cornerPose(Alliance.RED))
+        follower.setPose(Field.cornerPose(Alliance.RED))
         relocalizer.forgetOldPictures(System.nanoTime())
         logger = ShotLogger(AppUtil.ROBOT_DATA_DIR, "Shot Collector", Double.POSITIVE_INFINITY)
-        pickNextOffsets()
+        copyTableToSet()
+        pickNextSetting()
     }
 
     override fun loop() {
@@ -131,9 +142,9 @@ class ShotCollector : OpMode() {
         }
         val loopMs = loopTimer.milliseconds()
         loopTimer.reset()
-        localizer.update()
-        var pose = localizer.pose()
-        val velocity = localizer.velocity()
+        follower.update()
+        var pose = follower.pose()
+        val velocity = follower.velocity()
         battery.update()
 
         // The webcam fixes odometry drift (if turned on), so the logged distances stay right.
@@ -166,7 +177,7 @@ class ShotCollector : OpMode() {
 
         val shotFound = logger.update(
             ShotLogData.make(
-                clock.seconds(), loopMs, Alliance.RED, targetCell, if (sweepMode) "SWEEP" else "TEST", pose, velocity,
+                clock.seconds(), loopMs, Alliance.RED, targetCell, mode.name, pose, velocity,
                 target, aimPoint, RobotConstants.BALL_FLIGHT_SECONDS, shooter, false, feeding, false,
                 battery.volts, relocalizer.secondsSinceFix(System.nanoTime())
             )
@@ -191,7 +202,8 @@ class ShotCollector : OpMode() {
         shooter.flywheel.setRpm(0.0)
         intake.stop()
         transfer.stop()
-        drivetrain.stop()
+        follower.stop()
+        follower.update()   // the follower only sends commands to the motors in update()
         if (::logger.isInitialized) {
             logger.close(clock.seconds())
         }
@@ -211,14 +223,15 @@ class ShotCollector : OpMode() {
             speed = RobotConstants.SLOW_MODE_SPEED
         }
         // Field-centric for the RED drivers (they look toward +x).
-        drivetrain.drive(ManualDrive.fieldCentric(forward * speed, strafe * speed, turn * speed, pose.heading(), 0.0), true)
+        // Sent to the motors at the next follower.update().
+        follower.manual(ManualDrive.fieldCentric(forward * speed, strafe * speed, turn * speed, pose.heading(), 0.0))
 
         if (gamepad1.triangleWasPressed()) {
             targetCell = targetCell.other()
         }
         // Read the dpad first: reading it uses up the press.
         if (gamepad1.dpadDownWasPressed() && gamepad1.options) {
-            localizer.setPose(Field.cornerPose(Alliance.RED))
+            follower.setPose(Field.cornerPose(Alliance.RED))
             relocalizer.forgetOldPictures(System.nanoTime())
             gamepad1.rumble(300)
         }
@@ -229,8 +242,23 @@ class ShotCollector : OpMode() {
             shooter.isOn = !shooter.isOn
         }
         if (gamepad2.squareWasPressed()) {
-            sweepMode = !sweepMode
-            pickNextOffsets()
+            mode = CollectMode.entries[(mode.ordinal + 1) % CollectMode.entries.size]
+            pickNextSetting()
+        }
+
+        // SET mode: the sticks change the speed and hood. Read them in every mode, so a press made in
+        // another mode is not used up later.
+        val rpmSteps = rpmStick.update(-gamepad2.left_stick_y.toDouble())     // stick up = negative y
+        val hoodSteps = hoodStick.update(-gamepad2.right_stick_y.toDouble())
+        val copyTable = gamepad2.leftStickButtonWasPressed()
+        if (mode == CollectMode.SET) {
+            if (copyTable) {
+                copyTableToSet()
+            }
+            setRpm = (setRpm + rpmSteps * RobotConstants.SET_RPM_STEP).coerceIn(0.0, RobotConstants.SET_MAX_RPM)
+            setHood = (setHood + hoodSteps * RobotConstants.SET_HOOD_STEP)
+                .coerceIn(RobotConstants.HOOD_MIN_POSITION, RobotConstants.HOOD_MAX_POSITION)
+            pickNextSetting()
         }
         // Nudge the aim (positive = more to the left).
         if (gamepad2.leftBumperWasPressed()) {
@@ -253,7 +281,7 @@ class ShotCollector : OpMode() {
             if (logger.waitingForLabel > 0) {
                 logger.label(label, clock.seconds())
                 lastLabelText = "shot #%d = %s (press another label to fix it, before the next ball)".format(logger.shotsFound, label)
-                pickNextOffsets()   // a new random setting for the next ball
+                pickNextSetting()   // SWEEP: a new random setting for the next ball
             } else if (logger.relabelLastShot(label, clock.seconds())) {
                 lastLabelText = "shot #%d changed to %s".format(logger.shotsFound, label)
             }
@@ -294,14 +322,68 @@ class ShotCollector : OpMode() {
         return false
     }
 
-    /** SWEEP mode: a random change to the shot table's speed and hood for the next ball. TEST mode: none. */
-    private fun pickNextOffsets() {
-        if (sweepMode) {
-            shooter.rpmOffset = RobotConstants.SWEEP_RPM_OFFSETS.random()
-            shooter.hoodOffset = RobotConstants.SWEEP_HOOD_OFFSETS.random()
-        } else {
-            shooter.rpmOffset = 0.0
-            shooter.hoodOffset = 0.0
+    /**
+     * Sets the speed and hood for the next ball. SET: the operator's numbers. SWEEP: the shot table plus a
+     * random change. TEST: the shot table.
+     */
+    private fun pickNextSetting() {
+        shooter.rpmOffset = 0.0
+        shooter.hoodOffset = 0.0
+        shooter.rpmOverride = null
+        shooter.hoodOverride = null
+        when (mode) {
+            CollectMode.SET -> {
+                shooter.rpmOverride = setRpm
+                shooter.hoodOverride = setHood
+            }
+            CollectMode.SWEEP -> {
+                shooter.rpmOffset = RobotConstants.SWEEP_RPM_OFFSETS.random()
+                shooter.hoodOffset = RobotConstants.SWEEP_HOOD_OFFSETS.random()
+            }
+            CollectMode.TEST -> {}
+        }
+    }
+
+    /** SET mode: start from what the shot table says for the current distance (rounded to whole steps). */
+    private fun copyTableToSet() {
+        setRpm = (Math.round(shooter.setting.flywheelRpm / RobotConstants.SET_RPM_STEP) * RobotConstants.SET_RPM_STEP)
+            .coerceIn(0.0, RobotConstants.SET_MAX_RPM)
+        setHood = (Math.round(shooter.setting.hoodPosition / RobotConstants.SET_HOOD_STEP) * RobotConstants.SET_HOOD_STEP)
+            .coerceIn(RobotConstants.HOOD_MIN_POSITION, RobotConstants.HOOD_MAX_POSITION)
+    }
+
+    /**
+     * Turns a stick into steps: +1 or -1 once when it is pushed past halfway, then more while it is held
+     * (first after 0.4 s, then every 0.1 s). Otherwise 0.
+     */
+    private class StickSteps {
+        private val timer = ElapsedTime()
+        private var held = 0
+        private var repeating = false
+
+        fun update(stick: Double): Int {
+            // It must be pushed past 0.6 to start, but only let go below 0.3 to stop, so it does not flicker.
+            val direction = when {
+                stick > 0.6 || (held == 1 && stick > 0.3) -> 1
+                stick < -0.6 || (held == -1 && stick < -0.3) -> -1
+                else -> 0
+            }
+            if (direction == 0) {
+                held = 0
+                return 0
+            }
+            if (direction != held) {
+                held = direction
+                repeating = false
+                timer.reset()
+                return direction
+            }
+            if (timer.seconds() >= if (repeating) 0.1 else 0.4) {
+                repeating = true
+                timer.reset()
+                return direction
+            }
+            return 0
         }
     }
 
@@ -312,12 +394,14 @@ class ShotCollector : OpMode() {
         } else {
             telemetry.addData("Last label", lastLabelText)
         }
-        telemetry.addData(
-            "Mode",
-            "%s: next ball %+.0f rpm, hood %+.2f   (gamepad 2 square switches)".format(
-                if (sweepMode) "SWEEP" else "TEST", shooter.rpmOffset, shooter.hoodOffset
+        val modeText = when (mode) {
+            CollectMode.SET -> "SET: %.0f rpm, hood %.2f | left stick rpm, right stick hood, L3 = table (%.0f rpm, hood %.2f)".format(
+                setRpm, setHood, shooter.setting.flywheelRpm, shooter.setting.hoodPosition
             )
-        )
+            CollectMode.SWEEP -> "SWEEP: next ball table %+.0f rpm, hood %+.2f".format(shooter.rpmOffset, shooter.hoodOffset)
+            CollectMode.TEST -> "TEST: the shot table, no changes"
+        }
+        telemetry.addData("Mode", "$modeText   (gamepad 2 square switches)")
         val features = ShotFeatures.compute(pose, velocity, target, targetCell)
         val turret = ShotFeatures.turretPosition(pose)
         val leadDegrees = Math.toDegrees(Angle.normalizeSigned(Field.headingTo(turret, aimPoint) - Field.headingTo(turret, target)))
@@ -329,9 +413,8 @@ class ShotCollector : OpMode() {
         )
         telemetry.addData(
             "Flywheel",
-            "%.0f / %.0f rpm (table %.0f %+.0f) | hood %.2f (table %.2f %+.2f)".format(
-                shooter.flywheel.currentRpm(), shooter.flywheel.targetRpm, shooter.setting.flywheelRpm,
-                shooter.rpmOffset, shooter.hood.position, shooter.setting.hoodPosition, shooter.hoodOffset
+            "%.0f / %.0f rpm | hood %.2f".format(
+                shooter.flywheel.currentRpm(), shooter.flywheel.targetRpm, shooter.hood.position
             )
         )
         telemetry.addData("Target CELL", "RED $targetCell (gamepad 1 triangle switches)")

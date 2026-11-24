@@ -2,10 +2,9 @@ package org.firstinspires.ftc.teamcode.auto
 
 import com.bylazar.telemetry.JoinedTelemetry
 import com.bylazar.telemetry.PanelsTelemetry
+import com.pedropathing.follower.Follower
 import com.pedropathing.follower.ManualDrive
 import com.pedropathing.math.Pose
-import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.pedropathing.utils.Angle
 import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
@@ -26,7 +25,7 @@ import kotlin.math.min
 import kotlin.math.sign
 
 /*
- * A simple autonomous that does NOT need Pedro to be tuned. Use it until the Foresight Tuner is done.
+ * A simple autonomous that does NOT follow Pedro paths: a backup for BioBuzzAuto.
  *
  * Start like the GARDEN routine: back of the robot on the wall our up CELL opens toward
  * (RED: AUDIENCE wall, tile C1. BLUE: FAR wall, tile D6), intake facing the HIVE. The robot shoots
@@ -34,15 +33,14 @@ import kotlin.math.sign
  * At AUTO_PARK_START_SECONDS it stops waiting or shooting and drives to the LOADING ZONE.
  *
  * It drives with one simple rule: head straight for the next point, slowing down as it gets close.
- * The Pinpoint tells it where it is (the drive motors and Pinpoint must be set up, like for teleop).
+ * The follower's Pinpoint tells it where it is, and the follower drives the motors (like in teleop).
  *
  * During INIT, gamepad 1: dpad up/down = start delay,
  * dpad left / right = park in the half of the LOADING ZONE on your LEFT (corner) / RIGHT (middle).
  */
 abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
     private lateinit var hubs: List<LynxModule>
-    private lateinit var drivetrain: Mecanum
-    private lateinit var localizer: PinpointLocalizer
+    private lateinit var follower: Follower
     private lateinit var intake: Intake
     private lateinit var transfer: Transfer
     private lateinit var shooter: Shooter
@@ -66,15 +64,14 @@ abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
             hub.bulkCachingMode = LynxModule.BulkCachingMode.MANUAL
         }
 
-        drivetrain = Mecanum(hardwareMap, Constants.drivetrainConfig)
-        localizer = PinpointLocalizer(hardwareMap, Constants.localizerConfig)
+        follower = Constants.create(hardwareMap)
         intake = Intake(hardwareMap)
         transfer = Transfer(hardwareMap)
         shooter = Shooter(hardwareMap)
         hive = HiveTracker(alliance)
 
         val startPose = Field.forAlliance(AutoPoses.AUDIENCE_START, alliance)
-        localizer.setPose(startPose)
+        follower.setPose(startPose)
         // Point the turret and hood, and make sure the transfer is stopped, once, now.
         // Nothing may move after INIT is done (rule G304.H).
         shooter.aimAt(startPose, hive.target())
@@ -104,7 +101,7 @@ abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
 
         matchTimer.reset()
         // Set the start position again: the Pinpoint can miss a position set while it is still calibrating.
-        localizer.setPose(startPose)
+        follower.setPose(startPose)
 
         shooter.isOn = true                  // start the flywheel now, so it is up to speed sooner
         waitSeconds(startDelaySeconds)
@@ -132,8 +129,8 @@ abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
         for (hub in hubs) {
             hub.clearBulkCache()
         }
-        localizer.update()
-        val pose = localizer.pose()
+        follower.update()   // also sends the last drive command to the motors
+        val pose = follower.pose()
         shooter.aimAt(pose, hive.target())
         // Teleop starts from wherever autonomous stopped.
         PoseStorage.save(pose, hive.upCell)
@@ -160,7 +157,7 @@ abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
         val timer = ElapsedTime()
         while (opModeIsActive() && timer.seconds() < RobotConstants.AUTO_PATH_TIMEOUT_SECONDS) {
             updateRobot()
-            val pose = localizer.pose()
+            val pose = follower.pose()
             val xToGo = target.x() - pose.x()
             val yToGo = target.y() - pose.y()
             val distanceToGo = hypot(xToGo, yToGo)
@@ -193,9 +190,9 @@ abstract class SimpleAuto(private val alliance: Alliance) : LinearOpMode() {
             turnPower = turnPower.coerceIn(-RobotConstants.SIMPLE_AUTO_MAX_POWER, RobotConstants.SIMPLE_AUTO_MAX_POWER)
 
             // Field-centric with offset 0: the first number drives toward +x on the field, the second toward +y.
-            drivetrain.drive(ManualDrive.fieldCentric(xPower, yPower, turnPower, pose.heading(), 0.0), true)
+            follower.manual(ManualDrive.fieldCentric(xPower, yPower, turnPower, pose.heading(), 0.0))
         }
-        drivetrain.stop()
+        follower.stop()   // the motors stop at the next updateRobot()
     }
 
     /** True once it is time to stop waiting or shooting and go park. */

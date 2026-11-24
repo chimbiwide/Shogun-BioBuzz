@@ -42,7 +42,29 @@ public class Constants {
 
     // to be tuned
     public static ForesightConfig foresightConfig = new ForesightConfig(
-            c -> {}
+            c -> {
+                Controller primaryTranslationalForward = Controller.proportional(0.23701570961595672);
+                Controller secondaryTranslationalForward = Controller.proportional(0.08757097152669528);
+                Controller primaryTranslationalLateral = Controller.proportional(0.28357512785848155);
+                Controller secondaryTranslationalLateral = Controller.proportional(0.10477343247674004);
+
+                c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
+                c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
+
+                c.coast.set(Controller.proportionalFeedforward(0.011318766665569482));
+                c.brake.set(Controller.proportionalFeedforward(0.009620951665734059));
+
+                c.headingFeedback.set(Controller.proportional(3.7163641402313723));
+                c.headingBrakeCoefficients.set(Vector2D.cartesian(0.0652535869473493, 0.005766711265440045));
+
+                c.linearBrakeCoefficients.set(Matrix.diag(0.0993831985963346, 0.05326188938891411));
+                c.quadraticBrakeCoefficients.set(Matrix.diag(0.001485140573852914, 0.0020641810069002018));
+
+                c.maxAchievableForwardVelocity.set(67.6927780535113);
+                c.maxAchievableStrafeVelocity.set(62.304913180662695);
+                c.naturalForwardDeceleration.set(32.88449936135031);
+                c.naturalStrafeDeceleration.set(52.855107809053244);
+            }
     );
 
     public static Follower create(HardwareMap hp) {

@@ -2,10 +2,9 @@ package org.firstinspires.ftc.teamcode.teleOp
 
 import com.bylazar.telemetry.JoinedTelemetry
 import com.bylazar.telemetry.PanelsTelemetry
+import com.pedropathing.follower.Follower
 import com.pedropathing.follower.ManualDrive
 import com.pedropathing.math.Pose
-import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.pedropathing.utils.Angle
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.hardware.lynx.LynxModule
@@ -68,8 +67,7 @@ import kotlin.math.hypot
  */
 abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
     private lateinit var hubs: List<LynxModule>
-    private lateinit var drivetrain: Mecanum
-    private lateinit var localizer: PinpointLocalizer
+    private lateinit var follower: Follower
     private lateinit var intake: Intake
     private lateinit var transfer: Transfer
     private lateinit var shooter: Shooter
@@ -111,10 +109,8 @@ abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
             hub.bulkCachingMode = LynxModule.BulkCachingMode.MANUAL
         }
 
-        // We use the Pedro drivetrain and Pinpoint directly, so teleop works even before Pedro is tuned.
-        drivetrain = Mecanum(hardwareMap, Constants.drivetrainConfig)
-        localizer = PinpointLocalizer(hardwareMap, Constants.localizerConfig)
-        // The same Pinpoint, to correct only x and y when the webcam fixes our position.
+        follower = Constants.create(hardwareMap)
+        // The same Pinpoint the follower uses, to correct only x and y when the webcam fixes our position.
         pinpoint = hardwareMap.getAll(GoBildaPinpointDriver::class.java).firstOrNull()
         intake = Intake(hardwareMap)
         transfer = Transfer(hardwareMap)
@@ -175,7 +171,7 @@ abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
     override fun start() {
         matchTimer.reset()
         loopTimer.reset()
-        localizer.setPose(startPose)
+        follower.setPose(startPose)
         relocalizer.forgetOldPictures(System.nanoTime())
         if (RobotConstants.LOG_SHOTS_IN_TELEOP) {
             val name = if (alliance == Alliance.RED) RobotConstants.TELEOP_RED else RobotConstants.TELEOP_BLUE
@@ -190,9 +186,9 @@ abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
         }
         val loopMs = loopTimer.milliseconds()
         loopTimer.reset()
-        localizer.update()
-        var pose = localizer.pose()
-        val velocity = localizer.velocity()   // on the field: vx, vy in inches per second, omega in radians per second
+        follower.update()
+        var pose = follower.pose()
+        val velocity = follower.velocity()   // on the field: vx, vy in inches per second, omega in radians per second
         battery.update()
 
         // The webcam: fix odometry drift (if turned on), and a hint about which CELL is up.
@@ -274,7 +270,8 @@ abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
         shooter.flywheel.setRpm(0.0)
         intake.stop()
         transfer.stop()
-        drivetrain.stop()
+        follower.stop()
+        follower.update()   // the follower only sends commands to the motors in update()
         limelight.stop()
         shotLogger?.close(matchTimer.seconds())
     }
@@ -308,17 +305,17 @@ abstract class BioBuzzTeleOp(private val alliance: Alliance) : OpMode() {
         val powers = ManualDrive.fieldCentric(
             forward * speed, strafe * speed, turn * speed, pose.heading(), driverHeading
         )
-        drivetrain.drive(powers, true)
+        follower.manual(powers)   // sent to the motors at the next follower.update()
 
         // Fix odometry drift using a spot you can find by feel.
         // Two buttons, so it cannot happen by accident. (Read the dpad first: reading it uses up the press.)
         if (gamepad1.dpadDownWasPressed() && gamepad1.options) {
-            localizer.setPose(Field.cornerPose(alliance))
+            follower.setPose(Field.cornerPose(alliance))
             relocalizer.forgetOldPictures(System.nanoTime())   // older webcam pictures no longer match
             gamepad1.rumble(300)
         }
         if (gamepad1.shareWasPressed() && gamepad1.options) {
-            localizer.setPose(pose.withHeading(driverHeading))
+            follower.setPose(pose.withHeading(driverHeading))
             relocalizer.forgetOldPictures(System.nanoTime())
             gamepad1.rumble(300)
         }

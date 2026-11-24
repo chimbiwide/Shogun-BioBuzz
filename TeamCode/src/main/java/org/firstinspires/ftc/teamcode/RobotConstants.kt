@@ -26,12 +26,13 @@ object RobotConstants {
     // These must match the names in the Robot Configuration on the Driver Station.
     const val INTAKE_MOTOR = "intake"
     const val TRANSFER_MOTOR = "transfer"
-    const val FLYWHEEL_MOTOR = "flywheel"
+    const val FLYWHEEL_MOTOR_1 = "flywheel1"
+    const val FLYWHEEL_MOTOR_2 = "flywheel2"
     const val HOOD_SERVO = "hood"
     const val TURRET_SERVO_1 = "turret1"
     const val TURRET_SERVO_2 = "turret2"
     const val LIMELIGHT = "limelight"
-    const val WEBCAM = "Webcam 1"
+    const val WEBCAM = "webcam"
 
     // ---------------- Robot size ----------------
     // Measured from the CAD. Measure your real robot (turret pointing forward) and fix these!
@@ -49,7 +50,7 @@ object RobotConstants {
     const val POLLEN_MAX_TURN = 0.5
 
     // ---------------- Intake and transfer ----------------
-    const val INTAKE_POWER = 1.0
+    const val INTAKE_POWER = 0.8
     const val EJECT_POWER = -0.8
     const val TRANSFER_FEED_POWER = 1.0      // pushes POLLEN into the flywheel
     const val TRANSFER_REVERSE_POWER = -0.6
@@ -60,18 +61,19 @@ object RobotConstants {
     const val FLYWHEEL_REVERSED = true
     const val FLYWHEEL_TICKS_PER_REV = 28.0  // goBILDA and REV motors without a gearbox: 28
     const val FLYWHEEL_RPM_TOLERANCE = 100.0 // "ready to shoot" when this close to the target speed
-    // Velocity PIDF for the flywheel motor. A good starting F is 32767 / (max ticks per second).
-    // A 6000 RPM motor makes 6000 * 28 / 60 = 2800 ticks per second, so F = 32767 / 2800 = about 11.7.
-    const val FLYWHEEL_P = 15.0
-    const val FLYWHEEL_I = 0.0
-    const val FLYWHEEL_D = 0.0
-    const val FLYWHEEL_F = 11.7
+    // Our own speed control for the flywheel (Flywheel.kt), with speeds in ticks per second:
+    //   power = P * error + I * (sum of error * seconds) + D * (change in error per second) + F * target speed
+    // F alone should give about the right power: F = 1 / (ticks per second at full power).
+    const val FLYWHEEL_P = 0.025
+    const val FLYWHEEL_I = 0.04
+    const val FLYWHEEL_D = 0.0001
+    const val FLYWHEEL_F = 0.00088
 
     // ---------------- Hood ----------------
     // A small gear drives a big curved gear on the hood, so only part of the servo range is safe.
     // Find where the hood stops in both directions with the Shooter Tuner, then set these a little inside.
-    const val HOOD_MIN_POSITION = 0.45
-    const val HOOD_MAX_POSITION = 0.55
+    const val HOOD_MIN_POSITION = 0.38
+    const val HOOD_MAX_POSITION = 0.9
     // The hood's angle at those two positions, measured with a protractor (Shooter Tuner step 1).
     // Only used to log the hood angle for the shot model. Until you measure them (NaN = "not measured"),
     // the hood_deg column stays empty and the model can use hood_pos instead.
@@ -131,8 +133,8 @@ object RobotConstants {
     // Where the webcam lens sits on the robot. The webcam is not in the CAD: measure all of these!
     const val WEBCAM_FORWARD_INCHES = 5.4     // in front of the robot center (negative = behind it)
     const val WEBCAM_LEFT_INCHES = 3.0        // left of the robot center (negative = right of it)
-    const val WEBCAM_HEIGHT_INCHES = 8.5      // lens height above the floor
-    const val WEBCAM_PITCH_DEGREES = 40.0     // how far the camera is tilted up (0 = looking level)
+    const val WEBCAM_HEIGHT_INCHES = 10.5      // lens height above the floor
+    const val WEBCAM_PITCH_DEGREES = 45.0     // how far the camera is tilted up (0 = looking level)
     const val WEBCAM_YAW_DEGREES = 0.0        // 0 = looking forward, positive = turned to the left
     // A short exposure keeps pictures sharp while the robot moves; the gain brightens the dark picture.
     const val WEBCAM_EXPOSURE_MS = 6L
@@ -195,6 +197,10 @@ object RobotConstants {
     // speed and hood (picked at random), so the data shows where the shot goes in and where it misses.
     val SWEEP_RPM_OFFSETS = listOf(-150.0, -100.0, -50.0, 0.0, 50.0, 100.0, 150.0)
     val SWEEP_HOOD_OFFSETS = listOf(-0.01, 0.0, 0.01)
+    // Shot Collector, SET mode: the operator picks the speed and hood with gamepad 2's sticks, this much per step.
+    const val SET_RPM_STEP = 50.0
+    const val SET_HOOD_STEP = 0.01
+    const val SET_MAX_RPM = 6000.0            // a flywheel motor without a gearbox cannot go faster
 
     // ---------------- Autonomous ----------------
     // Stop everything else and go park after this many seconds. Parking from the audience side

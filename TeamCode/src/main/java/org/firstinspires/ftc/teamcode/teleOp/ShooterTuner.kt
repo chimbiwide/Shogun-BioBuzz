@@ -3,9 +3,8 @@ package org.firstinspires.ftc.teamcode.teleOp
 import com.bylazar.telemetry.JoinedTelemetry
 import com.bylazar.telemetry.PanelsTelemetry
 import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.follower.Follower
 import com.pedropathing.math.Pose
-import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import org.firstinspires.ftc.teamcode.RobotConstants
@@ -77,8 +76,7 @@ import kotlin.math.hypot
  */
 @TeleOp(name = "Shooter Tuner", group = "BioBuzz Tuning")
 class ShooterTuner : OpMode() {
-    private lateinit var drivetrain: Mecanum
-    private lateinit var localizer: PinpointLocalizer
+    private lateinit var follower: Follower
     private lateinit var intake: Intake
     private lateinit var transfer: Transfer
     private lateinit var shooter: Shooter
@@ -98,8 +96,7 @@ class ShooterTuner : OpMode() {
         if (RobotConstants.USE_PANELS) {
             telemetry = JoinedTelemetry(PanelsTelemetry.ftcTelemetry, telemetry)
         }
-        drivetrain = Mecanum(hardwareMap, Constants.drivetrainConfig)
-        localizer = PinpointLocalizer(hardwareMap, Constants.localizerConfig)
+        follower = Constants.create(hardwareMap)
         intake = Intake(hardwareMap)
         transfer = Transfer(hardwareMap)
         shooter = Shooter(hardwareMap)
@@ -117,12 +114,12 @@ class ShooterTuner : OpMode() {
     }
 
     override fun start() {
-        localizer.setPose(Field.cornerPose(Alliance.RED))
+        follower.setPose(Field.cornerPose(Alliance.RED))
     }
 
     override fun loop() {
-        localizer.update()
-        val pose = localizer.pose()
+        follower.update()
+        val pose = follower.pose()
 
         // Drive (robot-centric, so it is easy to make small moves).
         val powers = DrivePowers(
@@ -130,10 +127,10 @@ class ShooterTuner : OpMode() {
             -gamepad1.left_stick_x.toDouble(),
             -gamepad1.right_stick_x.toDouble()
         )
-        drivetrain.drive(powers, true)
+        follower.manual(powers)   // sent to the motors at the next follower.update()
 
         if (gamepad1.optionsWasPressed()) {
-            localizer.setPose(Field.cornerPose(Alliance.RED))
+            follower.setPose(Field.cornerPose(Alliance.RED))
         }
         if (gamepad1.triangleWasPressed()) {
             targetCell = targetCell.other()
@@ -260,7 +257,8 @@ class ShooterTuner : OpMode() {
         shooter.flywheel.setRpm(0.0)
         intake.stop()
         transfer.stop()
-        drivetrain.stop()
+        follower.stop()
+        follower.update()   // the follower only sends commands to the motors in update()
         limelight.stop()
     }
 }
